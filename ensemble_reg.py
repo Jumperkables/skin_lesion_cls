@@ -17,6 +17,9 @@ NUM_CLASSES = len(os.listdir(DATA_DIR))
 NUM_HEADS = 4
 BATCH_SIZE = 16
 ORTHOGONALITY_INTENSITY = 0.2
+SALIENCY_INTENSITY = 0.0002
+SALIENCY_SIGMA = 1e-7
+SALIENCY_ALPHA = 2e-8
 
 class SkinLesionClassifier(pl.LightningModule):
     def __init__(self):
@@ -46,52 +49,71 @@ class SkinLesionClassifier(pl.LightningModule):
             #setattr(self, f"criterion_{x}", nn.CrossEntropyLoss())
         self.criterion = nn.CrossEntropyLoss()
 
+
+
     def forward(self, x):
         x = self.features(x)
         x = torch.flatten(x, 1)
-        h_output = torch.zeros(x.shape[0], NUM_CLASSES).to(x.device)
-        h_outputs = []
+        head_outputs = []
         for i in range(NUM_HEADS):
             h_out = getattr(self, f"head_{i}")(x)
-            h_output += h_out
-            h_outputs.append(h_out)
-        # Calculate vector similarity, and penalise to enforce orthogonality 
-        dot_prods = []
-        saliencies = []
-        for i in range(NUM_HEADS):
-            # Enforce saliency to become concentrated
-            chosen_classes = torch.argmax(h_outputs[i], dim=0)
+            head_outputs.append(h_out)
+        return torch.stack(head_outputs, dim=0)
 
-            breakpoint()
-            h_outputs[i][0, chosen_classes] # Get the highest voted class for each element in the batch
+
+
+    def exec_step(self, mode, batch, batch_idx):
+        images, labels = batch
+        images.requires_grad_()
+        head_outputs = self(images)
+        dot_prods = []  # Calculate vector similarity, and penalise to enforce orthogonality 
+        saliencies = [] # Make sure that saliency maps are relatively concentrated
+        for i in range(NUM_HEADS):
+            if mode == "train": 
+                head_outputs[i].max(dim=1).values.sum().backward(retain_graph=True)
+                grads = images.grad.data
+                mean_mat = torch.ones(images.shape).to(images.device)*grads.mean()
+                diffs = (grads-mean_mat).abs()
+                sal = SALIENCY_ALPHA/(((SALIENCY_INTENSITY*diffs.mean())*0.5)+SALIENCY_SIGMA)
+                saliencies.append(sal)
+            else:
+                saliencies.append(0.)
             for j in range(NUM_HEADS):
                 if i != j:
-                    dim_0 = h_outputs[i].shape[0]
-                    dim_1 = h_outputs[i].shape[1]
-                    dp = torch.bmm( h_outputs[i].view(dim_0, 1, dim_1), h_outputs[j].view(dim_0, dim_1, 1) )
-                    dp = dp.squeeze(1).squeeze(1)
+                    dim_0 = head_outputs[i].shape[0]
+                    dim_1 = head_outputs[i].shape[1]
+                    dp = torch.bmm( head_outputs[i].view(dim_0, 1, dim_1), head_outputs[j].view(dim_0, dim_1, 1) )
+                    dp = dp.squeeze(1).squeeze(1).abs()
                     dot_prods.append(dp)
-        dot_prods = sum(dot_prods)
-        return h_output, dot_prods, saliencies
-
-    def training_step(self, batch, batch_idx):
-        images, labels = batch
-        h_output, dot_prods, saliencies = self(images)
-        loss = self.criterion(h_output, labels)
-        loss += sum(dot_prods)
-        self.log("train_loss", loss)
+        dot_prods = torch.stack(dot_prods, dim=0)
+        head_loss = self.criterion(head_outputs.mean(dim=0), labels) # Standard loss for class predictions
+        orthog_loss = dot_prods.mean() # Penalise vector similarity, enforce orthogonality
+        loss = head_loss + orthog_loss
+        saliency_loss = sum(saliencies)
+        loss = loss + saliency_loss
+        self.log(f"{mode}_loss_head", head_loss, prog_bar=(True if mode == "train" else False))
+        self.log(f"{mode}_loss_orthog", orthog_loss, prog_bar=(True if mode == "train" else False))
+        self.log(f"{mode}_loss_saliency", saliency_loss, prog_bar=(True if mode == "train" else False))
+        self.log(f"{mode}_loss_total", loss)
         return loss
 
+
+
+    def training_step(self, batch, batch_idx):
+        loss = self.exec_step("train", batch, batch_idx)
+        return loss
+
+
+
     def validation_step(self, batch, batch_idx):
-        images, labels = batch
-        h_output, dot_prods, saliencies = self(images)
-        breakpoint()
-        loss = self.criterion(h_output, labels)
-        loss += sum(dot_prods)
-        self.log("val_loss", loss)
+        loss = self.exec_step("valid", batch, batch_idx)
+
+
 
     def configure_optimizers(self):
         return optim.Adam(self.parameters(), lr=0.001)
+
+
 
 # Set transforms for data augmentation
 data_transforms = transforms.Compose([
