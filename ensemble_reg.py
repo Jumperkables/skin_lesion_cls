@@ -11,9 +11,12 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 import pytorch_lightning as pl
 
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+#os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 DATA_DIR = f"data/isic_subset_cleaned"
-NUM_CLASSES = os.listdir(DATA_DIR) 
+NUM_CLASSES = len(os.listdir(DATA_DIR))
+NUM_HEADS = 4
+BATCH_SIZE = 16
+ORTHOGONALITY_INTENSITY = 0.2
 
 class SkinLesionClassifier(pl.LightningModule):
     def __init__(self):
@@ -28,33 +31,63 @@ class SkinLesionClassifier(pl.LightningModule):
             nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        self.classifier = nn.Sequential(
-            nn.Linear(256 * 28 * 28, 1024),
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
-            nn.Linear(1024, NUM_CLASSES),
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
-
+        for x in range(NUM_HEADS):
+            head = nn.Sequential(
+                nn.Linear(512 * 14 * 14, 512),
+                nn.ReLU(inplace=True),
+                nn.Dropout(0.5),
+                nn.Linear(512, NUM_CLASSES),
+            )
+            setattr(self, f"head_{x}", head)
+            #setattr(self, f"criterion_{x}", nn.CrossEntropyLoss())
         self.criterion = nn.CrossEntropyLoss()
 
     def forward(self, x):
         x = self.features(x)
         x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
+        h_output = torch.zeros(x.shape[0], NUM_CLASSES).to(x.device)
+        h_outputs = []
+        for i in range(NUM_HEADS):
+            h_out = getattr(self, f"head_{i}")(x)
+            h_output += h_out
+            h_outputs.append(h_out)
+        # Calculate vector similarity, and penalise to enforce orthogonality 
+        dot_prods = []
+        saliencies = []
+        for i in range(NUM_HEADS):
+            # Enforce saliency to become concentrated
+            chosen_classes = torch.argmax(h_outputs[i], dim=0)
+
+            breakpoint()
+            h_outputs[i][0, chosen_classes] # Get the highest voted class for each element in the batch
+            for j in range(NUM_HEADS):
+                if i != j:
+                    dim_0 = h_outputs[i].shape[0]
+                    dim_1 = h_outputs[i].shape[1]
+                    dp = torch.bmm( h_outputs[i].view(dim_0, 1, dim_1), h_outputs[j].view(dim_0, dim_1, 1) )
+                    dp = dp.squeeze(1).squeeze(1)
+                    dot_prods.append(dp)
+        dot_prods = sum(dot_prods)
+        return h_output, dot_prods, saliencies
 
     def training_step(self, batch, batch_idx):
         images, labels = batch
-        outputs = self(images)
-        loss = self.criterion(outputs, labels)
+        h_output, dot_prods, saliencies = self(images)
+        loss = self.criterion(h_output, labels)
+        loss += sum(dot_prods)
         self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         images, labels = batch
-        outputs = self(images)
-        loss = self.criterion(outputs, labels)
+        h_output, dot_prods, saliencies = self(images)
+        breakpoint()
+        loss = self.criterion(h_output, labels)
+        loss += sum(dot_prods)
         self.log("val_loss", loss)
 
     def configure_optimizers(self):
@@ -75,8 +108,8 @@ test_size = len(dataset) - train_size
 train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=4)
-test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
 # Initialize the Lightning module
 skin_classifier = SkinLesionClassifier()
