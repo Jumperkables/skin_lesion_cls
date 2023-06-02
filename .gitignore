@@ -162,3 +162,4 @@ cython_debug/
 # Custom ignores
 data/
 lightning_logs/
+wandb/
