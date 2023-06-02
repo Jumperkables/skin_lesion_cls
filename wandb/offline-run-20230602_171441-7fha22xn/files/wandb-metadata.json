@@ -1,0 +1,109 @@
+{
+    "os": "Linux-6.2.2-arch1-1-x86_64-with-glibc2.37",
+    "python": "3.10.9",
+    "heartbeatAt": "2023-06-02T16:14:41.754607",
+    "startedAt": "2023-06-02T16:14:41.696207",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/jumperkables/EMPLOYMENT/2023_May-Present_EVERGREEN/skin_lesion_cls/ensemble_reg.py",
+    "codePath": "ensemble_reg.py",
+    "git": {
+        "remote": "git@github.com:Jumperkables/skin_lesion_cls.git",
+        "commit": "a38e4f652d9a2f3bfaae651d550a87d47f3da101"
+    },
+    "email": "tom.winterbottom@msn.com",
+    "root": "/home/jumperkables/EMPLOYMENT/2023_May-Present_EVERGREEN/skin_lesion_cls",
+    "host": "jerry",
+    "username": "jumperkables",
+    "executable": "/home/jumperkables/EMPLOYMENT/2023_May-Present_EVERGREEN/skin_lesion_cls/venv/bin/python",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 3377.7359999999994,
+        "min": 800.0,
+        "max": 4700.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3420.661,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3216.704,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3516.939,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3559.971,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3477.124,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3422.407,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 2755.732,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3200.028,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3230.36,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3332.906,
+            "min": 800.0,
+            "max": 4700.0
+        }
+    ],
+    "disk": {
+        "total": 884.053955078125,
+        "used": 810.3582763671875
+    },
+    "gpu": "NVIDIA GeForce RTX 2080 Ti",
+    "gpu_count": 2,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 2080 Ti",
+            "memory_total": 11811160064
+        },
+        {
+            "name": "NVIDIA GeForce RTX 2080 Ti",
+            "memory_total": 11811160064
+        }
+    ],
+    "memory": {
+        "total": 31.27153778076172
+    }
+}
