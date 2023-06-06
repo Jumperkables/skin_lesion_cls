@@ -117,7 +117,7 @@ class SkinLesionClassifier(pl.LightningModule):
         orthog_loss = dot_prods.mean() # Penalise vector similarity, enforce orthogonality
         loss = head_loss + orthog_loss
         saliency_loss = sum(saliencies)
-        loss = loss + saliency_loss
+        loss = loss# + saliency_loss
         self.log(f"{mode}_loss_head", head_loss, prog_bar=(True if mode == "train" else False))
         self.log(f"{mode}_loss_orthog", orthog_loss, prog_bar=(True if mode == "train" else False))
         self.log(f"{mode}_loss_saliency", saliency_loss, prog_bar=(True if mode == "train" else False))
@@ -186,8 +186,8 @@ wandb_logger = pl.loggers.WandbLogger()
 
 # Set transforms for data augmentation
 data_transforms = transforms.Compose([
-    #transforms.RandomResizedCrop(224),
-    #transforms.RandomHorizontalFlip(),
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
